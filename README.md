@@ -6,7 +6,7 @@ Choose any combination of three safeguards:
 
 - **Keep the display awake** uses a `PreventUserIdleDisplaySleep` IOKit assertion, equivalent to the important `caffeinate -d` behavior. This also prevents idle system sleep.
 - **Prevent idle system sleep** uses `PreventUserIdleSystemSleep`, equivalent to `caffeinate -i`, while still allowing the display to turn off if the display option is disabled.
-- **Send activity pulses while idle** reports native user activity after two minutes without keyboard, mouse, or tablet input, then once per minute while idle.
+- **Send activity pulses while idle** reports native user activity after a configurable period without keyboard, mouse, or tablet input, then once per minute while idle. The delay defaults to 120 seconds and accepts any positive whole number of seconds.
 
 The activity pulse is the supported macOS alternative to a synthetic mouse wiggle. It does not move the pointer and does not need Accessibility access. Option changes apply immediately while Caffeine Plus is active, and the selected options plus active/inactive choice are restored from `~/Library/Application Support/Caffeine Plus/state.json` on the next launch.
 

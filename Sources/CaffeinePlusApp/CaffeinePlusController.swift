@@ -61,6 +61,10 @@ final class CaffeinePlusController: ObservableObject {
         updateOptions { $0.sendActivityPulses = enabled }
     }
 
+    func setActivityPulseIdleSeconds(_ seconds: Int) {
+        updateOptions { $0.activityPulseIdleSeconds = max(1, seconds) }
+    }
+
     private func enable() {
         do {
             try engine.start(options: options)
@@ -129,11 +133,12 @@ final class CaffeinePlusController: ObservableObject {
     private func startHeartbeat() {
         stopHeartbeat()
 
-        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.heartbeat()
             }
         }
+        timer.tolerance = 0.1
         RunLoop.main.add(timer, forMode: .common)
         heartbeatTimer = timer
     }

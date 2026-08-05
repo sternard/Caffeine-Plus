@@ -20,10 +20,10 @@ struct CaffeinePlusApp: App {
     var body: some Scene {
         WindowGroup("Caffeine Plus") {
             CaffeinePlusView(controller: controller)
-                .frame(minWidth: 500, minHeight: 510)
+                .frame(minWidth: 500, minHeight: 550)
         }
         .windowStyle(.titleBar)
-        .defaultSize(width: 520, height: 540)
+        .defaultSize(width: 520, height: 580)
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
@@ -121,12 +121,35 @@ private struct CaffeinePlusView: View {
 
                 OptionToggle(
                     title: "Send activity pulses while idle",
-                    detail: "After two minutes without input, reports native activity once a minute without moving the pointer.",
+                    detail: "Reports native activity without moving the pointer, then renews once a minute while idle.",
                     isOn: Binding(
                         get: { controller.options.sendActivityPulses },
                         set: { controller.setSendActivityPulses($0) }
                     )
                 )
+
+                HStack(spacing: 8) {
+                    Text("Start after")
+                    TextField(
+                        "Seconds",
+                        value: activityPulseIdleSeconds,
+                        format: .number
+                    )
+                    .frame(width: 76)
+                    .multilineTextAlignment(.trailing)
+
+                    Text("seconds of inactivity")
+
+                    Stepper(value: activityPulseIdleSeconds, step: 1) {
+                        EmptyView()
+                    }
+                    .labelsHidden()
+
+                    Spacer(minLength: 0)
+                }
+                .font(.caption)
+                .padding(.leading, 22)
+                .disabled(!controller.options.sendActivityPulses)
 
                 Text(controller.isActive ? "Option changes apply immediately." : "All three safeguards are enabled by default.")
                     .font(.caption)
@@ -151,6 +174,13 @@ private struct CaffeinePlusView: View {
         .tint(controller.isActive ? .red : .accentColor)
         .disabled(!controller.isActive && !controller.canEnable)
         .keyboardShortcut(.defaultAction)
+    }
+
+    private var activityPulseIdleSeconds: Binding<Int> {
+        Binding(
+            get: { controller.options.activityPulseIdleSeconds },
+            set: { controller.setActivityPulseIdleSeconds($0) }
+        )
     }
 }
 

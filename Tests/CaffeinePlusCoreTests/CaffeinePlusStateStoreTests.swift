@@ -32,13 +32,32 @@ final class CaffeinePlusStateStoreTests: XCTestCase {
             options: CaffeineOptions(
                 keepDisplayAwake: true,
                 preventIdleSystemSleep: false,
-                sendActivityPulses: true
+                sendActivityPulses: true,
+                activityPulseIdleSeconds: 37
             )
         )
 
         try store.save(state)
 
         XCTAssertEqual(store.load(), state)
+    }
+
+    func testStateWithoutIdleThresholdUses120SecondDefault() throws {
+        let stateURL = temporaryDirectory.appendingPathComponent("state.json")
+        let legacyState = """
+        {
+          "isEnabled": true,
+          "options": {
+            "keepDisplayAwake": true,
+            "preventIdleSystemSleep": true,
+            "sendActivityPulses": true
+          }
+        }
+        """
+        try Data(legacyState.utf8).write(to: stateURL)
+        let store = CaffeinePlusStateStore(baseDirectory: temporaryDirectory)
+
+        XCTAssertEqual(store.load().options.activityPulseIdleSeconds, 120)
     }
 
     func testCorruptStateUsesSafeDefaults() throws {

@@ -2,6 +2,10 @@ import XCTest
 @testable import CaffeinePlusCore
 
 final class CaffeinePlusEngineTests: XCTestCase {
+    func testDefaultActivityPulseIdleThresholdIs120Seconds() {
+        XCTAssertEqual(CaffeineOptions.all.activityPulseIdleSeconds, 120)
+    }
+
     func testStartCreatesBothAssertionsAndInitialActivityPulse() throws {
         let provider = RecordingProvider()
         let engine = CaffeinePlusEngine(provider: provider)
@@ -49,22 +53,22 @@ final class CaffeinePlusEngineTests: XCTestCase {
         XCTAssertFalse(engine.isActive)
     }
 
-    func testPulseWaitsForInputIdleThresholdAndPulseInterval() throws {
+    func testPulseUsesConfiguredIdleThresholdAndFixedRenewalInterval() throws {
         let provider = RecordingProvider()
         let engine = CaffeinePlusEngine(
             provider: provider,
-            idleThreshold: 120,
             pulseInterval: 60
         )
         let start = Date(timeIntervalSince1970: 1_000)
-        try engine.start(at: start)
+        let options = CaffeineOptions(activityPulseIdleSeconds: 37)
+        try engine.start(options: options, at: start)
 
         XCTAssertFalse(try engine.pulseIfNeeded(
-            inputIdleDuration: 119,
+            inputIdleDuration: 36,
             at: start.addingTimeInterval(120)
         ))
         XCTAssertTrue(try engine.pulseIfNeeded(
-            inputIdleDuration: 120,
+            inputIdleDuration: 37,
             at: start.addingTimeInterval(120)
         ))
         XCTAssertFalse(try engine.pulseIfNeeded(
@@ -83,7 +87,7 @@ final class CaffeinePlusEngineTests: XCTestCase {
 
     func testPulseDoesNothingWhenOptionIsDisabled() throws {
         let provider = RecordingProvider()
-        let engine = CaffeinePlusEngine(provider: provider, idleThreshold: 0, pulseInterval: 0)
+        let engine = CaffeinePlusEngine(provider: provider, pulseInterval: 0)
         let options = CaffeineOptions(sendActivityPulses: false)
         try engine.start(options: options)
 
@@ -93,7 +97,7 @@ final class CaffeinePlusEngineTests: XCTestCase {
 
     func testStopReleasesLatestActivityAndPersistentAssertions() throws {
         let provider = RecordingProvider()
-        let engine = CaffeinePlusEngine(provider: provider, idleThreshold: 0, pulseInterval: 0)
+        let engine = CaffeinePlusEngine(provider: provider, pulseInterval: 0)
         let start = Date(timeIntervalSince1970: 1_000)
         try engine.start(at: start)
         _ = try engine.pulseIfNeeded(inputIdleDuration: 1_000, at: start.addingTimeInterval(1))

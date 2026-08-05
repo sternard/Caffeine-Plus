@@ -27,18 +27,23 @@ public protocol PowerAssertionProviding: AnyObject {
 }
 
 public struct CaffeineOptions: Codable, Equatable, Sendable {
+    public static let defaultActivityPulseIdleSeconds = 120
+
     public var keepDisplayAwake: Bool
     public var preventIdleSystemSleep: Bool
     public var sendActivityPulses: Bool
+    public var activityPulseIdleSeconds: Int
 
     public init(
         keepDisplayAwake: Bool = true,
         preventIdleSystemSleep: Bool = true,
-        sendActivityPulses: Bool = true
+        sendActivityPulses: Bool = true,
+        activityPulseIdleSeconds: Int = CaffeineOptions.defaultActivityPulseIdleSeconds
     ) {
         self.keepDisplayAwake = keepDisplayAwake
         self.preventIdleSystemSleep = preventIdleSystemSleep
         self.sendActivityPulses = sendActivityPulses
+        self.activityPulseIdleSeconds = max(1, activityPulseIdleSeconds)
     }
 
     public static let all = CaffeineOptions()
@@ -51,6 +56,44 @@ public struct CaffeineOptions: Codable, Equatable, Sendable {
         [keepDisplayAwake, preventIdleSystemSleep, sendActivityPulses]
             .filter { $0 }
             .count
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case keepDisplayAwake
+        case preventIdleSystemSleep
+        case sendActivityPulses
+        case activityPulseIdleSeconds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        keepDisplayAwake = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .keepDisplayAwake
+        ) ?? true
+        preventIdleSystemSleep = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .preventIdleSystemSleep
+        ) ?? true
+        sendActivityPulses = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .sendActivityPulses
+        ) ?? true
+        activityPulseIdleSeconds = max(
+            1,
+            try container.decodeIfPresent(
+                Int.self,
+                forKey: .activityPulseIdleSeconds
+            ) ?? Self.defaultActivityPulseIdleSeconds
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(keepDisplayAwake, forKey: .keepDisplayAwake)
+        try container.encode(preventIdleSystemSleep, forKey: .preventIdleSystemSleep)
+        try container.encode(sendActivityPulses, forKey: .sendActivityPulses)
+        try container.encode(activityPulseIdleSeconds, forKey: .activityPulseIdleSeconds)
     }
 }
 
@@ -114,7 +157,6 @@ public final class IOKitPowerAssertionProvider: PowerAssertionProviding {
 }
 
 public final class CaffeinePlusEngine {
-    public static let defaultIdleThreshold: TimeInterval = 2 * 60
     public static let defaultPulseInterval: TimeInterval = 60
 
     public private(set) var isActive = false
@@ -122,7 +164,6 @@ public final class CaffeinePlusEngine {
     public private(set) var activeOptions: CaffeineOptions?
 
     private let provider: PowerAssertionProviding
-    private let idleThreshold: TimeInterval
     private let pulseInterval: TimeInterval
     private let reason = "Caffeine Plus is enabled"
 
@@ -131,11 +172,9 @@ public final class CaffeinePlusEngine {
 
     public init(
         provider: PowerAssertionProviding = IOKitPowerAssertionProvider(),
-        idleThreshold: TimeInterval = CaffeinePlusEngine.defaultIdleThreshold,
         pulseInterval: TimeInterval = CaffeinePlusEngine.defaultPulseInterval
     ) {
         self.provider = provider
-        self.idleThreshold = max(0, idleThreshold)
         self.pulseInterval = max(0, pulseInterval)
     }
 
@@ -198,8 +237,9 @@ public final class CaffeinePlusEngine {
         at date: Date = Date()
     ) throws -> Bool {
         guard isActive,
-              activeOptions?.sendActivityPulses == true,
-              inputIdleDuration >= idleThreshold else {
+              let activeOptions,
+              activeOptions.sendActivityPulses,
+              inputIdleDuration >= TimeInterval(max(1, activeOptions.activityPulseIdleSeconds)) else {
             return false
         }
 
