@@ -10,6 +10,8 @@ Choose any combination of three safeguards:
 
 The activity pulse is the supported macOS alternative to a synthetic mouse wiggle. It does not move the pointer and does not need Accessibility access. Option changes apply immediately while Caffeine Plus is active, and the selected options plus active/inactive choice are restored from `~/Library/Application Support/Caffeine Plus/state.json` on the next launch.
 
+While Caffeine Plus is active, its control window collapses to a compact status view and stays above ordinary app windows across Spaces. Selecting **Allow Normal Sleep** restores the previous window size and normal window ordering.
+
 ## Run
 
 ```sh
