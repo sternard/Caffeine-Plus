@@ -20,7 +20,6 @@ struct CaffeinePlusApp: App {
     var body: some Scene {
         WindowGroup("Caffeine Plus") {
             CaffeinePlusView(controller: controller)
-                .frame(minWidth: 500, minHeight: 550)
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 520, height: 580)
@@ -34,22 +33,23 @@ private struct CaffeinePlusView: View {
     @ObservedObject var controller: CaffeinePlusController
 
     var body: some View {
+        Group {
+            if controller.isActive {
+                compactView
+            } else {
+                expandedView
+            }
+        }
+        .background {
+            CaffeinePlusWindowConfigurator(isActive: controller.isActive)
+        }
+    }
+
+    private var expandedView: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
             safeguards
             primaryAction
-
-            if controller.isActive,
-               controller.options.sendActivityPulses,
-               let lastPulseDate = controller.lastPulseDate {
-                HStack(spacing: 5) {
-                    Image(systemName: "wave.3.right")
-                    Text("Last activity pulse:")
-                    Text(lastPulseDate, style: .relative)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
 
             if let errorMessage = controller.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -66,6 +66,31 @@ private struct CaffeinePlusView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
+        .frame(
+            minWidth: CaffeinePlusWindowMetrics.expandedMinimumContentSize.width,
+            minHeight: CaffeinePlusWindowMetrics.expandedMinimumContentSize.height
+        )
+    }
+
+    private var compactView: some View {
+        VStack(spacing: 16) {
+            header
+
+            Button {
+                controller.toggle()
+            } label: {
+                Label("Allow Normal Sleep", systemImage: "stop.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .keyboardShortcut(.defaultAction)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(
+            width: CaffeinePlusWindowMetrics.compactContentSize.width,
+            height: CaffeinePlusWindowMetrics.compactContentSize.height
+        )
     }
 
     private var header: some View {
@@ -181,6 +206,129 @@ private struct CaffeinePlusView: View {
             get: { controller.options.activityPulseIdleSeconds },
             set: { controller.setActivityPulseIdleSeconds($0) }
         )
+    }
+}
+
+private enum CaffeinePlusWindowMetrics {
+    static let compactContentSize = NSSize(width: 242, height: 130)
+    static let expandedMinimumContentSize = NSSize(width: 500, height: 550)
+}
+
+private struct CaffeinePlusWindowConfigurator: NSViewRepresentable {
+    let isActive: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> WindowReferenceView {
+        let view = WindowReferenceView()
+        update(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: WindowReferenceView, context: Context) {
+        update(nsView, coordinator: context.coordinator)
+    }
+
+    private func update(_ view: WindowReferenceView, coordinator: Coordinator) {
+        view.onWindowChange = { window in
+            guard let window else {
+                return
+            }
+            coordinator.scheduleConfiguration(for: window, isActive: isActive)
+        }
+
+        if let window = view.window {
+            coordinator.scheduleConfiguration(for: window, isActive: isActive)
+        }
+    }
+
+    final class Coordinator {
+        private weak var configuredWindow: NSWindow?
+        private var wasActive = false
+        private var expandedFrame: NSRect?
+        private var expandedCollectionBehavior: NSWindow.CollectionBehavior = []
+
+        func scheduleConfiguration(for window: NSWindow, isActive: Bool) {
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let self, let window else {
+                    return
+                }
+                self.configure(window, isActive: isActive)
+            }
+        }
+
+        func configure(_ window: NSWindow, isActive: Bool) {
+            if configuredWindow !== window {
+                configuredWindow = window
+                wasActive = false
+                expandedFrame = nil
+                expandedCollectionBehavior = window.collectionBehavior
+            }
+
+            guard isActive != wasActive else {
+                window.level = isActive ? .floating : .normal
+                return
+            }
+
+            if isActive {
+                enterCompactMode(window)
+            } else {
+                leaveCompactMode(window)
+            }
+
+            wasActive = isActive
+        }
+
+        private func enterCompactMode(_ window: NSWindow) {
+            expandedFrame = window.frame
+            expandedCollectionBehavior = window.collectionBehavior
+
+            window.level = .floating
+            window.collectionBehavior.formUnion([.canJoinAllSpaces, .fullScreenAuxiliary])
+            window.contentMinSize = CaffeinePlusWindowMetrics.compactContentSize
+            window.contentMaxSize = CaffeinePlusWindowMetrics.compactContentSize
+
+            let compactFrameSize = window.frameRect(
+                forContentRect: NSRect(origin: .zero, size: CaffeinePlusWindowMetrics.compactContentSize)
+            ).size
+            var compactFrame = window.frame
+            compactFrame.origin.y = compactFrame.maxY - compactFrameSize.height
+            compactFrame.size = compactFrameSize
+            window.setFrame(compactFrame, display: true, animate: true)
+        }
+
+        private func leaveCompactMode(_ window: NSWindow) {
+            window.level = .normal
+            window.collectionBehavior = expandedCollectionBehavior
+            window.contentMinSize = CaffeinePlusWindowMetrics.expandedMinimumContentSize
+            window.contentMaxSize = NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+
+            let fallbackContentRect = NSRect(
+                origin: .zero,
+                size: NSSize(width: 520, height: 552)
+            )
+            let fallbackFrame = window.frameRect(forContentRect: fallbackContentRect)
+            let targetFrame = expandedFrame ?? NSRect(
+                origin: window.frame.origin,
+                size: fallbackFrame.size
+            )
+            window.setFrame(targetFrame, display: true, animate: true)
+            expandedFrame = nil
+        }
+    }
+}
+
+private final class WindowReferenceView: NSView {
+    var onWindowChange: ((NSWindow?) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onWindowChange?(window)
     }
 }
 
