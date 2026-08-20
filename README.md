@@ -1,6 +1,6 @@
 # Caffeine Plus
 
-Caffeine Plus is a local-only macOS utility that keeps the display and Mac awake until you turn it off. It opens as a normal standalone window when launched from Mac Assistant; Mac Assistant remains the only menu-bar app in the workspace.
+Caffeine Plus is a local-only macOS utility that keeps the display and Mac awake until you turn it off.
 
 Choose any combination of three safeguards:
 
